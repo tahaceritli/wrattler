@@ -29,6 +29,9 @@ RUN Rscript -e "install.packages('cleanEHR')"
 # copy this package into the image and create directories for input and output
 ADD . R_service
 WORKDIR R_service
+ADD anon_public_d.RData .
+ADD sample_ccd.RData .
+
 
 
 EXPOSE 7103

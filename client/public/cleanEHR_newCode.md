@@ -25,18 +25,15 @@ library(purrr)
 library(cleanEHR)
 
 # download and read full dataset
-file <- paste(tempdir(), "/ccd.rdata", sep="")
-download.file("https://github.com/ropensci/cleanEHR/raw/master/data/sample_ccd.RData", file)
-load(file)
-
-dt <- ccd_demographic_table(ccd, dtype=TRUE)
+load("anon_public_d.RData")
+dt <- ccd_demographic_table(anon_ccd, dtype=TRUE)
 
 # get the codes of time series variables
 names_ts_variables <- c()
 counter <- 1
-for (i in 1:length(ccd@episodes)){
-  for (n in names(ccd@episodes[[i]]@data)){
-    if (length(ccd@episodes[[i]]@data[n][[1]]) == 2){ # guarantee time series
+for (i in 1:length(anon_ccd@episodes)){
+  for (n in names(anon_ccd@episodes[[i]]@data)){
+    if (length(anon_ccd@episodes[[i]]@data[n][[1]]) == 2){ # guarantee time series
       names_ts_variables[[counter]] <- n
       counter <- counter+1
     }
@@ -44,6 +41,7 @@ for (i in 1:length(ccd@episodes)){
 }
 names_ts_variables <- sort(unique(names_ts_variables))
 short_names_ts_variables <- lapply(names_ts_variables, FUN = code2stname)
+
 
 mean_tail_diff <- function(vector) {
   diff <- mean(vector,na.rm=TRUE) - tail(vector,n=1)
@@ -66,30 +64,38 @@ dts <- data.frame(matrix(NA, nrow=0, ncol=length(names_for_dts)))
 names(dts) <- names_for_dts
 
 ## prepare TS dataset
-for (i in 1:length(ccd@episodes)){
-  adno <- as.numeric(ccd@episodes[[i]]@data[index_variable][[1]])
+ dts <- data.frame(matrix(NA, nrow=0, ncol=length(names_for_dts)))
+names(dts) <- names_for_dts
+
+## prepare TS dataset
+for (i in 1:length(anon_ccd@episodes)){
+  adno <- as.numeric(anon_ccd@episodes[[i]]@data[index_variable][[1]])
   measurements <- c(adno)
   for (n in names_ts_variables){
       # Add time limit of 10 hours to measure TS data!
-      dts_episode <- ccd@episodes[[i]]@data[n][[1]]
+      dts_episode <- anon_ccd@episodes[[i]]@data[n][[1]]
 
       dts_episode_sub <- subset(dts_episode, dts_episode$time < 10)
 
+
       values <- dts_episode_sub["item2d"][[1]]
-      
+      print(n)
       
     if (!is_empty(values)){
       for (measure in ts_measures_funcs){
         
         measurements <- c(measurements,measure(as.numeric(values))[[1]])
+        
+
       }
     } else {
       measurements <- c(measurements,rep(NA,length(ts_measures)))
     }
   }
   dts <- rbind(dts,measurements)
-  names(dts) <- names_for_dts
+  #  names(dts) <- names_for_dts
 }
+
 ```
 
 ### Data wrangling on Python
