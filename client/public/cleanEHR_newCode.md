@@ -28,6 +28,13 @@ library(cleanEHR)
 load("anon_public_d.RData")
 dt <- ccd_demographic_table(anon_ccd, dtype=TRUE)
 
+
+mean_tail_diff <- function(vector) {
+  
+  diff <- mean(vector,na.rm=TRUE) - tail(vector,n=1)
+  return (diff)
+}
+
 # get the codes of time series variables
 names_ts_variables <- c()
 counter <- 1
@@ -41,12 +48,6 @@ for (i in 1:length(anon_ccd@episodes)){
 }
 names_ts_variables <- sort(unique(names_ts_variables))
 short_names_ts_variables <- lapply(names_ts_variables, FUN = code2stname)
-
-
-mean_tail_diff <- function(vector) {
-  diff <- mean(vector,na.rm=TRUE) - tail(vector,n=1)
-  return (diff)
-}
 
 # our index is NIHR_HIC_ICU_0005, corresponding to a unique (per episode/patient) admission number, or ADNO
 index_variable <- "NIHR_HIC_ICU_0005"
@@ -64,10 +65,7 @@ dts <- data.frame(matrix(NA, nrow=0, ncol=length(names_for_dts)))
 names(dts) <- names_for_dts
 
 ## prepare TS dataset
- dts <- data.frame(matrix(NA, nrow=0, ncol=length(names_for_dts)))
-names(dts) <- names_for_dts
-
-## prepare TS dataset
+## length(anon_ccd@episodes)
 for (i in 1:length(anon_ccd@episodes)){
   adno <- as.numeric(anon_ccd@episodes[[i]]@data[index_variable][[1]])
   measurements <- c(adno)
@@ -77,23 +75,19 @@ for (i in 1:length(anon_ccd@episodes)){
 
       dts_episode_sub <- subset(dts_episode, dts_episode$time < 10)
 
-
       values <- dts_episode_sub["item2d"][[1]]
-      print(n)
       
     if (!is_empty(values)){
       for (measure in ts_measures_funcs){
         
         measurements <- c(measurements,measure(as.numeric(values))[[1]])
-        
-
       }
     } else {
       measurements <- c(measurements,rep(NA,length(ts_measures)))
     }
   }
   dts <- rbind(dts,measurements)
-  #  names(dts) <- names_for_dts
+  names(dts) <- names_for_dts
 }
 
 ```
@@ -120,16 +114,19 @@ dt = dt.dropna(axis=1, how='all')
 
 Create functions to help with the wrangling challenges such as datetime format processing: 
 ```python
-def export_datetime_slash(s):
-    
-    return str(pd.to_datetime(s,infer_datetime_format=True))
+def export_datetime_slash(input_):
+    s = str(input_)
+    if s == 'None' or s == np.datetime64('NaT') or s=='NULL' or s=='NaT' or s==None or ('NULL' in s):
+        return "1969-01-01	01:00:00"
+    else:    
+        return str(pd.to_datetime(s,infer_datetime_format=True))
 
-def export_datetime(s):
-
-    if 'NULL' in s or 'None' in s or 'NaN' in s or s == np.datetime64('NaT'):
+def export_datetime(input_):
+    s = str(input_)
+    if s == 'None' or s == np.datetime64('NaT') or s=='NULL' or s=='NaT' or ('NULL' in s):
         return "1969-01-01	01:00:00"
         
-    if "T" in s:
+    elif "T" in s:
         if len(s.split("T")[1].split(":")) > 2:
             return str(s.split("T")[0]+" "+s.split("T")[1])
         else:
@@ -368,11 +365,11 @@ let y_nts_pred_list = []
 let y_nts_true_list = []
 
 for (let i = 0; i < y_pred_reg.length; i++){
-	y_pred_list.push(y_pred_reg[i][0])
-  y_true_list.push(y_true_reg[i][0])
+	y_pred_list.push(y_pred_reg[i][0]/60)
+  y_true_list.push(y_true_reg[i][0]/60)
   
-  y_nts_pred_list.push(y_nts_pred_reg[i][0])
-  y_nts_true_list.push(y_nts_true_reg[i][0])
+  y_nts_pred_list.push(y_nts_pred_reg[i][0]/60)
+  y_nts_true_list.push(y_nts_true_reg[i][0]/60)
 }
 
 var trace1 = {
@@ -498,13 +495,13 @@ cnf_matrix_nts = metrics.confusion_matrix(y_nts_test_class, y_nts_pred_class)
 
 ```javascript
 let xValues =  ['< 100 hours', '> 100 hours']
-let yValues =  ['< 100 hours', '> 100 hours']
+let yValues =  ['> 100 hours','< 100 hours']
 let zValues = []
 let aRow = [];
-for (let i  = 0; i < xValues.length; i++) {
+for ( var i = xValues.length-1; i >=0; i-- ) {
   aRow = [];
   for (let j  = 0; j < yValues.length; j++) {
-    aRow.push(cnf_matrix_nts[i][j])
+    aRow.push(cnf_matrix_nts[i][j]/(cnf_matrix_nts[i][0]+cnf_matrix_nts[i][1]))
   }
   zValues.push(aRow)
 }
@@ -607,14 +604,14 @@ cnf_matrix = metrics.confusion_matrix(y_test_class, y_pred_class)
 
 ```javascript
 let xValues_cnf_ = ['< 100 hours', '> 100 hours']
-let yValues_cnf_ = ['< 100 hours', '> 100 hours']
+let yValues_cnf_ =  ['> 100 hours','< 100 hours']
 
 let zValues_cnf_ = []
 let aRow_cnf_ = [];
-for (let i  = 0; i < xValues_cnf_.length; i++) {
+for ( var i = xValues.length-1; i >=0; i-- ) {
   aRow_cnf_ = [];
   for (let j  = 0; j < yValues_cnf_.length; j++) {
-    aRow_cnf_.push(cnf_matrix[i][j])
+    aRow_cnf_.push(cnf_matrix[i][j]/(cnf_matrix[i][0]+cnf_matrix[i][1]))
   }
   zValues_cnf_.push(aRow_cnf_)
 }
