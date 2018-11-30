@@ -378,14 +378,14 @@ var trace1 = {
   x: y_true_list,
   y: y_pred_list,
   mode: 'markers',
-  name: 'Prediction',
+  name: 'All data',
 };
 
 var trace2 = {
   x: y_nts_true_list,
   y: y_nts_pred_list,
   mode: 'markers',
-  name: 'NTS Prediction',
+  name: 'Demographic-only data',
 };
 
 var layout_reg_nts = {
@@ -656,7 +656,7 @@ let layout_cnf= {
 
 for ( var i = yValues_cnf_.length-1; i >=0; i-- ) {
   for ( var j = 0; j < xValues_cnf_.length; j++ ) {
-    var currentValue_ = zValues_cnf_[j][i];
+    var currentValue_ = zValues_cnf_[i][j];
     if (currentValue_ != 0.0) {
       var textColor_ = 'white';
     }else{
@@ -667,7 +667,7 @@ for ( var i = yValues_cnf_.length-1; i >=0; i-- ) {
       yref: 'y1',
       x: xValues_cnf_[j],
       y: yValues_cnf_[i],
-      text: zValues_cnf_[j][i],
+      text: zValues_cnf_[i][j],
       font: {
         family: 'Arial',
         size: 12,
