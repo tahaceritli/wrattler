@@ -30,7 +30,6 @@ RUN Rscript -e "install.packages('cleanEHR')"
 ADD . R_service
 WORKDIR R_service
 ADD anon_public_d.RData .
-ADD sample_ccd.RData .
 
 
 
