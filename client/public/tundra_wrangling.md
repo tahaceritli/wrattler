@@ -289,10 +289,6 @@ sites_ <- unique(sites_)
 rownames(sites_) <- NULL
 sites_["index"] <- c(1:nrow(sites_))
 filtered_dataset_sites <- merge(filtered_dataset_sites, sites_, by=c("SiteName","lat_index","log_index"))
-```
-
-
-```r
 
 ## Change commented line to use precipitation rather than temperature data
 # data_folder <- "dataset/401_PRE_monthly_1950_2015" # precipitation data
@@ -302,7 +298,8 @@ myFiles <- sort(myFiles)
 
 # load time series for mean temperatures (1950-2015)
 l <- 2017-1950
-# create matrix for time series
+
+
 
 ts <- rep(NA,nrow(sites_)*l)
 dim(ts) <- c(nrow(sites_),l)
@@ -311,7 +308,7 @@ dim(ts) <- c(nrow(sites_),l)
 for (filename in myFiles) {
   year <- as.numeric(substring(filename,nchar(filename)-11,nchar(filename)-8))
   month <- as.numeric(substring(filename,nchar(filename)-7,nchar(filename)-6))
-  if (month == ref_month){
+  if (month == 7){
     data = read.csv(paste(data_folder, filename, sep = "/"), header = FALSE, skip=45)
     for (row in 1:nrow(sites_)) {
       long_i <- sites_[row,"log_index"]
@@ -321,4 +318,29 @@ for (filename in myFiles) {
     }
   }
 }
+
+filtered_dataset.tmp <- NA
+# add information to the data frame
+for (row in 1:nrow(filtered_dataset_sites)) {
+  year_index <- filtered_dataset_sites[row,"Year"]-1949
+  if (year_index >= 0 && year_index <= ncol(ts)){
+    filtered_dataset_sites[row,"tmp"] <- ts[filtered_dataset_sites[row,"index"],year_index]
+  }
+}
+```
+
+```r
+filtered_dataset_final <- subset(filtered_dataset_sites,(!is.na(filtered_dataset_sites$tmp)))
+# mean-center by species
+filtered_dataset_final <- ddply(filtered_dataset_final, c("AccSpeciesName"), transform, tmp.centered = scale(tmp, center = TRUE, scale = FALSE))
+# drop species without sufficient temperature span (irrelevant if before or after centering!)
+max_tmp = max(ts, na.rm = TRUE)
+min_tmp = min(ts, na.rm = TRUE)
+tmp_range = (max_tmp - min_tmp)/10
+filtered_dataset_final <- filtered_dataset_final %>% group_by(AccSpeciesName) %>% mutate(tmp_range = max(tmp, na.rm = TRUE)-min(tmp, na.rm = TRUE))
+filtered_dataset_final <- subset(filtered_dataset_final,(filtered_dataset_final>=tmp_range))
+n_rows_final <- nrow(filtered_dataset_final)
+n_rows_cols <- ncol(filtered_dataset_final)
+
+
 ```
