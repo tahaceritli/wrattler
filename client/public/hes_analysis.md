@@ -335,5 +335,4 @@ y_baseline = np.repeat(y_train_final.mean(axis=0)[:, None], y_test_final.shape[0
 mean_absolute_error_model =  mean_absolute_error(y_train_final, y_pred)
 mean_absolute_error_baseleine = mean_absolute_error(y_train_final, y_baseline)
 
-
 ```
