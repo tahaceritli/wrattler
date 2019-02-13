@@ -336,5 +336,4 @@ mean_absolute_error_model =  mean_absolute_error(y_train_final, y_pred)
 mean_absolute_error_baseleine = mean_absolute_error(y_train_final, y_baseline)
 
 
-
 ```
