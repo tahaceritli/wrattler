@@ -14,9 +14,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.metrics import classification_report, confusion_matrix, mean_absolute_error
-from sklearn.linear_model import ElasticNetCV
 
 
 # load the data
@@ -41,7 +38,7 @@ df_appliance_types = df_appliance_types.loc[
 ```
 
 ```python
-df_profiles =  pd.read_csv("csv/agd-1a/appliance_group_data-1a_0.001.csv",header=None,names=['IntervalID','Household','ApplianceCode','DateRecorded','Data','TimeRecorded'])
+df_profiles =  pd.read_csv("csv/agd-1a/appliance_group_data-1a_0.01.csv",header=None,names=['IntervalID','Household','ApplianceCode','DateRecorded','Data','TimeRecorded'])
 
 #get the appliance group codes by joining the tables
 df_profiles = df_profiles.merge(df_appliance_types, how='left', on='ApplianceCode')
@@ -220,15 +217,6 @@ for column in df_y.columns:
 
 ```
 
-```python
-
-# prepare data for modelling
-df_all = df_X.merge(df_y, left_index=True, right_index=True)
-X = df_all[df_all.columns[:-13]].values
-y = df_all[df_all.columns[-1:-13:-1]].values
-
-```
-
 ### Model energy usage of houses
 We attempt to predict the quantity of energy that a given household
 
@@ -236,6 +224,8 @@ We attempt to predict the quantity of energy that a given household
 ```python
 
 from sklearn.model_selection import train_test_split
+# prepare data for modelling
+df_all = df_X.merge(df_y, left_index=True, right_index=True)
 
 # split the houses into train/test sets
 houses = df_all["Household2"].unique()
@@ -248,38 +238,36 @@ df_test = df_all.loc[df_all['Household2'].isin(houses_test)]
 
 def get_X_y(df):
     # create X and y arrays for scikit learn from dataframes
-    X = df[df.columns[:-9]].values
-    y = df[df.columns[-1:-10:-1]].values
+    
+    columns_X = ['TotalUsage', 'HouseholdOccupancy', 'HouseholdWithChildren',
+       'House.age', 'Social.Grade', 'PensionerOnly', 'Friday', 'Monday',
+       'Saturday', 'Sunday', 'Thursday', 'Tuesday', 'Wednesday', 'fourier0',
+       'fourier1', 'fourier2', 'fourier3']
+    columns_y = ['1013.0', '1008.0', '1007.0', '1006.0', '1005.0', '1004.0', '1003.0', '1002.0', '1001.0']
+    X = df[columns_X].values
+    y = df[columns_y].values
     return X, y
 
 X_train, y_train = get_X_y(df_train)
 X_test, y_test = get_X_y(df_test)
-
-
 ```
 
-
-
 ```python
-
-
 # drop columns with all zeros
 ind = np.copy(~np.all(y_test == 0, axis=0))
 y_train_final = y_train.loc[:, ind]
 y_test_final = y_test.loc[:, ind]
 
-apply_rows = [1013.0, 1008.0, 1007.0, 1006.0, 1004.0, 1002.0, 1001.0]
+apply_rows =[1013.0, 1008.0, 1007.0, 1006.0, 1004.0, 1002.0, 1001.0]
 
 appliances = df_appliance_type_codes.set_index("Code").loc[apply_rows,"Name"].values
 
-```
 
-```python
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import ElasticNetCV
 
 
-def train_models(X_train, y_train):
+def train_predict_models(X_train, y_train,X_test):
     """A simple model that first classifies the measurement as being 0 or non zero, then 
     predicts the non-zero values."""
     
@@ -308,11 +296,7 @@ def train_models(X_train, y_train):
         X_i = X_reg[ind, :]
         y_i = y_i[ind]
         regressors[i].fit(X_i, y_i)
-    
-    return (clf, regressors)
 
-
-def predict(X_test, clf, regressors):
     """Given a classifier and set of regressors, produce predictions."""
     X_test = X_test.values
     y_bin = clf.predict(X_test)
@@ -326,12 +310,129 @@ def predict(X_test, clf, regressors):
     
     return y_bin, y_pred
     
+
+    
 # fit the models and predict on the test set
-clf, regressors = train_models(X_train, y_train_final)
-y_bin, y_pred = predict(X_test, clf, regressors)
+y_bin, y_pred = train_predict_models(X_train, y_train_final,X_test)
+
+```
+
+```python
+from sklearn.metrics import classification_report, confusion_matrix, mean_absolute_error
 y_baseline = np.repeat(y_train_final.mean(axis=0)[:, None], y_test_final.shape[0], axis=1).T
 
-mean_absolute_error_model =  mean_absolute_error(y_train_final, y_pred)
-mean_absolute_error_baseleine = mean_absolute_error(y_train_final, y_baseline)
 
+y_test_final = y_test_final.values
+y_train_final = y_train_final.values
+
+
+mean_absolute_error_model =  np.repeat(mean_absolute_error(y_test_final, y_pred),1)
+mean_absolute_error_baseline = np.repeat(mean_absolute_error(y_test_final, y_baseline),1)
+
+
+# produce a baseline that is closer to the model
+np.random.seed(42)
+y_baseline_better = np.zeros_like(y_test_final)
+
+for i in range(y_test_final.shape[1]):
+    y_baseline_better[:, i] = np.random.binomial(1,
+        (y_train_final[:, i] != 0.0).sum() / len(y_train_final[:, i]),
+        size=y_baseline_better.shape[0]
+    )
+    ind = y_baseline_better[:, i] != 0.0
+    val = np.mean(y_train_final[:, i][y_train_final[:, i] != 0.0])
+    y_baseline_better[ind, i] = val
+
+mean_absolute_error_baseline_better = np.repeat(mean_absolute_error(y_test_final, y_baseline_better),1)
+
+```
+
+The model beats the very naive baseline of the mean of each column. Instead, we try a different baseline that mimics the more sophisticated model (y_baseline_better). It assings a nonzero value at random to each entry in `y` using a binomial distribution with rate set by the fraction of nonzero entries in that column of the training set. The nonzero values are then set to the mean of the nonzero values of that column in the training set.
+
+##  Modeling results
+
+In the next figures, the results for the modeling for each appliance is shown. The figures compare the data, the 
+baseline and the full model.  
+```python
+import seaborn as sns
+import matplotlib.pyplot as plt
+from sklearn.metrics import mean_absolute_error
+
+
+y_test_final = y_test_final.values
+y_train_final = y_train_final.values
+y_pred = y_pred.values
+y_baseline_better = y_baseline_better.values
+appliances = appliances.values
+
+# plot the distribution of the test set, model and baseline
+# the mean absolute error for each appliance group is in brackets in the legend
+fig, ax = plt.subplots(7, 1, figsize=(10, 22.5))
+
+model_label = "Model ({:.4f})".format( mean_absolute_error(y_test_final[:, 0], y_pred[:, 0]))
+baseline_label = "Baseline ({:.4f})".format(mean_absolute_error(y_test_final[:, 0], y_baseline_better[:, 0]))
+sns.distplot(y_test_final[:, 0], norm_hist=False, kde=False, label="Data", ax=ax[0])
+sns.distplot(y_pred[:, 0], norm_hist=False, kde=False, label=model_label, ax=ax[0])
+sns.distplot(y_baseline_better[:, 0], norm_hist=False, kde=False, label=baseline_label, ax=ax[0])
+ax[0].set_title(appliances[0],fontsize=15)
+ax[0].set_ylabel("Frequency",fontsize=14)
+ax[0].legend(fontsize=14)
+
+
+model_label1 = "Model ({:.4f})".format( mean_absolute_error(y_test_final[:, 1], y_pred[:, 1]))
+baseline_label1 = "Baseline ({:.4f})".format(mean_absolute_error(y_test_final[:, 1], y_baseline_better[:, 1]))
+sns.distplot(y_test_final[:, 1], norm_hist=False, kde=False, label="Data", ax=ax[1])
+sns.distplot(y_pred[:, 1], norm_hist=False, kde=False, label=model_label1, ax=ax[1])
+sns.distplot(y_baseline_better[:, 1], norm_hist=False, kde=False, label=baseline_label1, ax=ax[1])
+ax[1].set_title(appliances[1],fontsize=15)
+ax[1].set_ylabel("Frequency",fontsize=14)
+ax[1].legend(fontsize=14)
+
+model_label2 = "Model ({:.4f})".format( mean_absolute_error(y_test_final[:, 2], y_pred[:, 2]))
+baseline_label2 = "Baseline ({:.4f})".format(mean_absolute_error(y_test_final[:, 2], y_baseline_better[:, 2]))
+sns.distplot(y_test_final[:, 2], norm_hist=False, kde=False, label="Data", ax=ax[2])
+sns.distplot(y_pred[:, 2], norm_hist=False, kde=False, label=model_label2, ax=ax[2])
+sns.distplot(y_baseline_better[:, 2], norm_hist=False, kde=False, label=baseline_label2, ax=ax[2])
+ax[2].set_title(appliances[2],fontsize=15)
+ax[2].set_ylabel("Frequency",fontsize=14)
+ax[2].legend(fontsize=14)
+
+model_label3 = "Model ({:.4f})".format( mean_absolute_error(y_test_final[:, 3], y_pred[:, 3]))
+baseline_label3 = "Baseline ({:.4f})".format(mean_absolute_error(y_test_final[:, 3], y_baseline_better[:, 3]))
+sns.distplot(y_test_final[:, 3], norm_hist=False, kde=False, label="Data", ax=ax[3])
+sns.distplot(y_pred[:, 3], norm_hist=False, kde=False, label=model_label3, ax=ax[3])
+sns.distplot(y_baseline_better[:, 3], norm_hist=False, kde=False, label=baseline_label3, ax=ax[3])
+ax[3].set_title(appliances[3],fontsize=15)
+ax[3].set_ylabel("Frequency",fontsize=14)
+ax[3].legend(fontsize=14)
+
+model_label4 = "Model ({:.4f})".format( mean_absolute_error(y_test_final[:, 4], y_pred[:, 4]))
+baseline_label4 = "Baseline ({:.4f})".format(mean_absolute_error(y_test_final[:, 4], y_baseline_better[:, 4]))
+sns.distplot(y_test_final[:, 4], norm_hist=False, kde=False, label="Data", ax=ax[4])
+sns.distplot(y_pred[:, 4], norm_hist=False, kde=False, label=model_label4, ax=ax[4])
+sns.distplot(y_baseline_better[:, 4], norm_hist=False, kde=False, label=baseline_label4, ax=ax[4])
+ax[4].set_title(appliances[4],fontsize=15)
+ax[4].set_ylabel("Frequency",fontsize=14)
+ax[4].legend(fontsize=14)
+
+model_label5 = "Model ({:.4f})".format( mean_absolute_error(y_test_final[:, 5], y_pred[:, 5]))
+baseline_label5 = "Baseline ({:.4f})".format(mean_absolute_error(y_test_final[:, 5], y_baseline_better[:, 5]))
+sns.distplot(y_test_final[:, 5], norm_hist=False, kde=False, label="Data", ax=ax[5])
+sns.distplot(y_pred[:, 5], norm_hist=False, kde=False, label=model_label5, ax=ax[5])
+sns.distplot(y_baseline_better[:, 5], norm_hist=False, kde=False, label=baseline_label5, ax=ax[5])
+ax[5].set_title(appliances[5],fontsize=15)
+ax[5].set_ylabel("Frequency",fontsize=14)
+ax[5].legend(fontsize=14)
+
+model_label6 = "Model ({:.4f})".format( mean_absolute_error(y_test_final[:, 6], y_pred[:, 6]))
+baseline_label6 = "Baseline ({:.4f})".format(mean_absolute_error(y_test_final[:, 6], y_baseline_better[:, 6]))
+sns.distplot(y_test_final[:, 6], norm_hist=False, kde=False, label="Data", ax=ax[6])
+sns.distplot(y_pred[:, 6], norm_hist=False, kde=False, label=model_label6, ax=ax[6])
+sns.distplot(y_baseline_better[:, 6], norm_hist=False, kde=False, label=baseline_label6, ax=ax[6])
+ax[6].set_title(appliances[6],fontsize=15)
+ax[6].set_ylabel("Frequency",fontsize=14)
+ax[6].legend(fontsize=14)
+ax[6].set_xlabel("Normalised consumption",fontsize=14)
+
+plt.tight_layout()
 ```
