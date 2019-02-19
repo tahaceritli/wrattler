@@ -46,7 +46,6 @@ df_profiles.columns = df_profiles.columns.str.strip()
 df_profiles["Household2"] = df_profiles["Household"]
 
 
-
 ### 2. Drop rows with temperature readings
 # Some of the rows correspond to temperature readings, which are not appliances, and therefore must be dropped.
 
