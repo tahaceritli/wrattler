@@ -247,12 +247,25 @@ observations_individual <- unique(ttt.clean$ValueKindName)
 # 4.7%
 percentage_observations_individual_ <- nrow(subset(ttt.clean,ttt.clean$ValueKindName %in% c("Site specific mean","Plot mean","Maximum in plot")))/nrow(ttt.clean) 
 
+ttt.save_nrow <- c(nrow(ttt.save),1)
+ttt.save_ncol <- c(ncol(ttt.save) ,1)
+
 filtered_dataset <- subset(ttt.save,(!is.na(ttt.save$Latitude)) & (!is.na(ttt.save$Longitude)) & (!is.na(ttt.save$Year))) # keep only existing Lat and Long with a year
+
+filtered_dataset_nrow <- c(nrow(filtered_dataset),1)
+filtered_dataset_ncol <- c(ncol(filtered_dataset) ,1)
 
 
 # Keep only species represented in more than 4 sites
 filtered_dataset <- filtered_dataset %>% group_by(AccSpeciesName) %>% mutate(unique_sites = n_distinct(SiteName))
+
+filtered_dataset_nrow1 <- c(nrow(filtered_dataset),1)
+filtered_dataset_ncol1 <- c(ncol(filtered_dataset) ,1)
+
 filtered_dataset <- subset(filtered_dataset,filtered_dataset$unique_sites > 3) # only species present in 4 or more distinct sites
+
+filtered_dataset_nrow2 <- c(nrow(filtered_dataset),1)
+filtered_dataset_ncol2 <- c(ncol(filtered_dataset) ,1)
 
 # Get site information, trim by number of observations (> 10)
 filtered_dataset$lat_trimmed = round(filtered_dataset$Latitude,digits=2)
@@ -263,9 +276,20 @@ filtered_dataset$log_trimmed = round(filtered_dataset$Longitude,digits=2)
 
 
 sites <- select(filtered_dataset, lat_trimmed,log_trimmed,SiteName)
+
+sites_nrow <- c(nrow(sites),1)
+sites_ncol <- c(ncol(sites) ,1)
+
 sites <- sites %>% group_by(SiteName,lat_trimmed,log_trimmed) %>% filter(n()>10) 
+
+sites_nrow1 <- c(nrow(sites),1)
+sites_ncol1 <- c(ncol(sites) ,1)
+
 rounding <- function(a) round(a,digits = 2)
 sites <- na.omit(unique(cbind(sites[3], lapply(sites[1:2], rounding))))
+
+sites_nrow2 <- c(nrow(sites),1)
+sites_ncol2 <- c(ncol(sites) ,1)
 
 sites <- arrange(sites,SiteName) 
 
@@ -279,17 +303,30 @@ index_pos <- function(n,cnt=90){ # 90 for latitude, 180 for longitude
 }
 sites$lat_index = index_pos(sites$lat_trimmed)
 sites$log_index = index_pos(sites$log_trimmed,180)
+
+sites_nrow3 <- c(nrow(sites),1)
+sites_ncol3 <- c(ncol(sites) ,1)
+
 ```
 ```r
 filtered_dataset_sites <- merge(filtered_dataset, sites, by=c("SiteName","lat_trimmed","log_trimmed"))
 
-sites_ <- subset(sites, by=c("SiteName","lat_index","log_index"))
+filtered_dataset_sites_nrow <- c(nrow(filtered_dataset_sites),1) # Note this final dataset is slightly more aggressivley trimmed than in the paper!
+filtered_dataset_sites_ncol <- c(ncol(filtered_dataset_sites) ,1)
+
+sites_ <- select(sites, SiteName,lat_index,log_index)
 
 sites_ <- unique(sites_)
 rownames(sites_) <- NULL
 sites_["index"] <- c(1:nrow(sites_))
+
+s_nrow4 <- c(nrow(sites_),1)
+sites_ncol4 <- c(ncol(sites_) ,1)
+
 filtered_dataset_sites <- merge(filtered_dataset_sites, sites_, by=c("SiteName","lat_index","log_index"))
 
+filtered_dataset_sites_nrow1 <- c(nrow(filtered_dataset_sites),1) # Note this final dataset is slightly more aggressivley trimmed than in the paper!
+filtered_dataset_sites_ncol1 <- c(ncol(filtered_dataset_sites) ,1)
 ## Change commented line to use precipitation rather than temperature data
 # data_folder <- "dataset/401_PRE_monthly_1950_2015" # precipitation data
 data_folder <- "401_TMP_monthly_1950_2015" # temperature data
@@ -299,7 +336,7 @@ myFiles <- sort(myFiles)
 # load time series for mean temperatures (1950-2015)
 l <- 2017-1950
 
-
+ref_month = 7 # July, or 1 for January, etc.
 
 ts <- rep(NA,nrow(sites_)*l)
 dim(ts) <- c(nrow(sites_),l)
@@ -308,16 +345,20 @@ dim(ts) <- c(nrow(sites_),l)
 for (filename in myFiles) {
   year <- as.numeric(substring(filename,nchar(filename)-11,nchar(filename)-8))
   month <- as.numeric(substring(filename,nchar(filename)-7,nchar(filename)-6))
-  if (month == 7){
+  if (month == ref_month){
     data = read.csv(paste(data_folder, filename, sep = "/"), header = FALSE, skip=45)
     for (row in 1:nrow(sites_)) {
       long_i <- sites_[row,"log_index"]
       lat_i <- sites_[row,"lat_index"]
-      if (data[[long_i+1]][[lat_i]] > -1000){ # note that -10000 is the not observed value for this dataset...
-        ts[row,year-1949] <- data[[long_i+1]][[lat_i]]}
+      data_value <- data[[long_i+1]][[lat_i]]
+
+      if (data_value > -1000){ # note that -10000 is the not observed value for this dataset...
+        ts[row,year-1949] <- data_value}
     }
   }
 }
+
+a<-dim(ts)
 
 filtered_dataset.tmp <- NA
 # add information to the data frame
@@ -327,18 +368,24 @@ for (row in 1:nrow(filtered_dataset_sites)) {
     filtered_dataset_sites[row,"tmp"] <- ts[filtered_dataset_sites[row,"index"],year_index]
   }
 }
-```
+filtered_dataset_sites_nrow2 <- c(nrow(filtered_dataset_sites),1) # Note this final dataset is slightly more aggressivley trimmed than in the paper!
+filtered_dataset_sites_ncol2 <- c(ncol(filtered_dataset_sites) ,1)
 
-```r
-filtered_dataset_final <- subset(filtered_dataset_sites,(!is.na(filtered_dataset_sites$tmp)))
+
+filtered_dataset_sites <- subset(filtered_dataset_sites,(!is.na(filtered_dataset_sites$tmp)))
+
+final_filtered_nrow <- c(nrow(filtered_dataset_sites),1) # Note this final dataset is slightly more aggressivley trimmed than in the paper!
+final_filtered_ncol <- c(ncol(filtered_dataset_sites) ,1)
+
 # mean-center by species
-filtered_dataset_final <- ddply(filtered_dataset_final, c("AccSpeciesName"), transform, tmp.centered = scale(tmp, center = TRUE, scale = FALSE))
+filtered_dataset_final <- ddply(filtered_dataset_sites, c("AccSpeciesName"), transform, tmp.centered = scale(tmp, center = TRUE, scale = FALSE))
 # drop species without sufficient temperature span (irrelevant if before or after centering!)
 max_tmp = max(ts, na.rm = TRUE)
 min_tmp = min(ts, na.rm = TRUE)
 tmp_range = (max_tmp - min_tmp)/10
+
 filtered_dataset_final <- filtered_dataset_final %>% group_by(AccSpeciesName) %>% mutate(tmp_range = max(tmp, na.rm = TRUE)-min(tmp, na.rm = TRUE))
-filtered_dataset_final <- subset(filtered_dataset_final,(filtered_dataset_final>=tmp_range))
+filtered_dataset_final <- subset(filtered_dataset_final,filtered_dataset_final$tmp_range>=tmp_range)
 n_rows_final <- nrow(filtered_dataset_final)
 n_rows_cols <- ncol(filtered_dataset_final)
 
