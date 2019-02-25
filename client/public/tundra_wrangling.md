@@ -294,15 +294,16 @@ sites_ncol2 <- c(ncol(sites) ,1)
 sites <- arrange(sites,SiteName) 
 
 # Create grid with site indexes
+# Create grid with site indexes
 index_pos <- function(n,cnt=90){ # 90 for latitude, 180 for longitude
-  dec_part <- n%%1
-  int_part <- floor(n)
-  incr <- 1
-  if (dec_part >= 0.5) {incr <- 2}
+  dec_part = n%%1
+  int_part = floor(n)
+  incr = 1
+  if (dec_part >= 0.5) {incr = 2}
   return((int_part+cnt)*2+incr)
 }
-sites$lat_index = index_pos(sites$lat_trimmed)
-sites$log_index = index_pos(sites$log_trimmed,180)
+sites$lat_index = index_pos(sites$lat_trimmed)-1
+sites$log_index = index_pos(sites$log_trimmed,180)+1
 
 sites_nrow3 <- c(nrow(sites),1)
 sites_ncol3 <- c(ncol(sites) ,1)
@@ -340,6 +341,7 @@ ref_month = 7 # July, or 1 for January, etc.
 
 ts <- rep(NA,nrow(sites_)*l)
 dim(ts) <- c(nrow(sites_),l)
+ts <- data.frame(ts)
 
 # then read them in, for instance through
 for (filename in myFiles) {
@@ -352,13 +354,14 @@ for (filename in myFiles) {
       lat_i <- sites_[row,"lat_index"]
       data_value <- data[[long_i+1]][[lat_i]]
 
-      if (data_value > -1000){ # note that -10000 is the not observed value for this dataset...
-        ts[row,year-1949] <- data_value}
+       if (data_value > -1000){ # note that -10000 is the not observed value for this dataset...
+        row_index <- row
+        column_index <- year-1949
+        ts[row_index,column_index] <- data_value}
     }
   }
 }
 
-a<-dim(ts)
 
 filtered_dataset.tmp <- NA
 # add information to the data frame
@@ -382,10 +385,10 @@ filtered_dataset_final <- ddply(filtered_dataset_sites, c("AccSpeciesName"), tra
 # drop species without sufficient temperature span (irrelevant if before or after centering!)
 max_tmp = max(ts, na.rm = TRUE)
 min_tmp = min(ts, na.rm = TRUE)
-tmp_range = (max_tmp - min_tmp)/10
+tmp_range_values = (max_tmp - min_tmp)/10
 
 filtered_dataset_final <- filtered_dataset_final %>% group_by(AccSpeciesName) %>% mutate(tmp_range = max(tmp, na.rm = TRUE)-min(tmp, na.rm = TRUE))
-filtered_dataset_final <- subset(filtered_dataset_final,filtered_dataset_final$tmp_range>=tmp_range)
+filtered_dataset_final <- subset(filtered_dataset_final,filtered_dataset_final$tmp_range>=tmp_range_values)
 n_rows_final <- nrow(filtered_dataset_final)
 n_rows_cols <- ncol(filtered_dataset_final)
 
