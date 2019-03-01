@@ -352,7 +352,8 @@ The model beats the very naive baseline of the mean of each column. Instead, we 
 ##  Modeling results
 
 In the next figures, the results for the modeling for each appliance is shown. The figures compare the data, the 
-baseline and the full model.  
+baseline and the full model. 
+ 
 ```python
 import seaborn as sns
 import matplotlib.pyplot as plt
