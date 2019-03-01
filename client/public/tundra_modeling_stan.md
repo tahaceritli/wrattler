@@ -64,11 +64,7 @@ figure2 <- ggplot(df) +
     labs(x = "Temperature (ºC)", y = "Trait")
 
 
-```
 
-```r
-
-predicted_df <- data.frame(col1=tmp, col2=unlist(test_line))
 
 colnames(predicted_df) <- c("tmp","Value")
 
