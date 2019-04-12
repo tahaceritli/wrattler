@@ -34,11 +34,15 @@ RUN Rscript -e "install.packages('dplyr')"
 RUN Rscript -e "install.packages('readr')"
 RUN Rscript -e "install.packages('rlang')"
 RUN Rscript -e "install.packages('devtools')"
-RUN Rscript -e "devtools::install_github('alan-turing-institute/datadiff', build_vignettes=TRUE)"
+
 
 # copy current working directory
 ADD . R_service
 WORKDIR R_service
+
+
+RUN Rscript testpat.r
+RUN Rscript -e "devtools::install_github('alan-turing-institute/datadiff', build_vignettes=TRUE)"
 
 # expose the port and start running the Jug http server.
 EXPOSE 7103
